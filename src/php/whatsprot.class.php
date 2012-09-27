@@ -9,6 +9,7 @@ class WhatsProt
 
     protected $_whatsAppHost = "bin-short.whatsapp.net";
     protected $_whatsAppServer = "s.whatsapp.net";
+    protected $_whatsAppGroupServer = "g.us";
     protected $_whatsAppRealm = "s.whatsapp.net";
     protected $_whatsAppDigest = "xmpp/s.whatsapp.net";
     protected $_device = "iPhone";
@@ -202,11 +203,6 @@ class WhatsProt
                     array_push($this->_messageQueue, $node);
                     $this->sendMessageReceived($node);
                 }
-                if (strcmp($node->_tag, "iq") == 0 AND strcmp($node->_attributeHash['type'], "get") == 0 AND strcmp($node->_children[0]->_tag, "ping") == 0)
-                {
-                    $this->Pong($node->_attributeHash['id']);
-                }
-
                 $node = $this->_reader->nextTree();
             }
         }
@@ -266,8 +262,14 @@ class WhatsProt
         return $ret;
     }
 
-    protected function SendMessageNode($msgid, $to, $node)
+    public function Message($msgid, $to, $txt)
     {
+        $whatsAppServer = $this->_whatsAppServer;
+        if(strpos($to, "-") !== false)
+        {
+            $whatsAppServer = $this->_whatsAppGroupServer;
+        }
+        $bodyNode = new ProtocolNode("body", null, null, $txt);
         $serverNode = new ProtocolNode("server", null, null, "");
 
         $xHash = array();
@@ -275,45 +277,12 @@ class WhatsProt
         $xNode = new ProtocolNode("x", $xHash, array($serverNode), "");
 
         $messageHash = array();
-        $messageHash["to"] = $to . "@" . $this->_whatsAppServer;
+        $messageHash["to"] = $to . "@" . $whatsAppServer;
         $messageHash["type"] = "chat";
         $messageHash["id"] = $msgid;
-        $messsageNode = new ProtocolNode("message", $messageHash, array($xNode, $node), "");
+        $messsageNode = new ProtocolNode("message", $messageHash, array($xNode, $bodyNode), "");
         $this->sendNode($messsageNode);
     }
-
-    public function Message($msgid, $to, $txt)
-    {
-        $bodyNode = new ProtocolNode("body", null, null, $txt);
-        $this->SendMessageNode($msgid, $to, $bodyNode);
-    }
-
-    public function MessageImage($msgid, $to, $url, $file, $size, $icon)
-    {
-        $mediaAttribs = array();
-        $mediaAttribs["xmlns"] = "urn:xmpp:whatsapp:mms";
-        $mediaAttribs["type"] = "image";
-        $mediaAttribs["url"] = $url;
-        $mediaAttribs["file"] = $file;
-        $mediaAttribs["size"] = $size;
-
-        $mediaNode = new ProtocolNode("media", $mediaAttribs, null, $icon);
-        $this->SendMessageNode($msgid, $to, $mediaNode);
-    }
-    
-    public function Pong($msgid)
-    {
-        $whatsAppServer = $this->_whatsAppServer;
-
-        $messageHash = array();
-        $messageHash["to"] = $whatsAppServer;
-        $messageHash["id"] = $msgid;
-        $messageHash["type"] = "result";
-       
-       	$messsageNode = new ProtocolNode("iq", $messageHash, null, "");
-	$this->sendNode($messsageNode);
-    }
-
     protected function DebugPrint($debugMsg)
     {
         if ($this->_debug)
